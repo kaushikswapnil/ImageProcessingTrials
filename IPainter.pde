@@ -5,10 +5,10 @@ interface IPainter
 
 class PatchPainter implements IPainter
 {
- float m_PatchSize = 8.0f;
- int m_PatchAlpha = 20;
+ float m_PatchSize = 5.0f;
+ int m_PatchAlpha = 50;
  
- int m_NumPatchesPerFrame = 200;
+ int m_NumPatchesPerFrame = 1000;
  
  void draw()
  {
@@ -164,4 +164,55 @@ class VanGoghPainter implements IPainter
    m_Particles.add(new Particle(particlePos, particleColor)); 
   }
  }
+}
+
+class ThreeDPainter implements IPainter
+{
+  class Particle
+  {
+   PVector m_ImgPos;
+   color m_ImgCol;
+   
+   Particle(PVector imgPos, color imgCol)  
+   {
+     m_ImgPos = imgPos.copy();
+     m_ImgCol = imgCol;
+   }
+  }
+  ArrayList<Particle> m_Particles;
+  
+  ThreeDPainter()
+  {
+    m_Particles = new ArrayList<Particle>();
+    
+    for (int y = 0; y < g_Image.height; ++y)
+    {
+     for (int x = 0; x < g_Image.width; ++x)
+     {
+       m_Particles.add(new Particle(new PVector(x, y), g_Image.pixels[x + (y * g_Image.width)]));
+     }
+    }
+  }
+  
+  void draw()
+  {
+    background(#ffffff);
+    //translate(g_Image.width/2, g_Image.height/2);
+    
+    noStroke();
+    float distFactor = map(constrain(mouseX, 0, width), 0, width, -1.0f, 1.0f);
+    PVector center = new PVector(g_Image.width/2, g_Image.height/2);
+    float maxDistSq = (sq((g_Image.width/2)) + sq((g_Image.height/2)));
+    float maxDist = sqrt(maxDistSq);
+    for (Particle p : m_Particles)
+    {
+      pushMatrix();
+      PVector toCenter = PVector.sub(center, p.m_ImgPos);
+      float z = -5000 * distFactor * toCenter.mag() * toCenter.mag() / maxDistSq;
+      translate(p.m_ImgPos.x, p.m_ImgPos.y, z);
+      fill(p.m_ImgCol);
+      ellipse(0, 0, 2.0f, 2.0f);
+      popMatrix();
+    }
+  }
 }

@@ -13,14 +13,15 @@ void setup()
    //g_Image = loadImage("Image3.jpg");
    //size(1000, 667);
    g_Image = loadImage("Image4.jpg");
-   size(900, 600);
+   size(1200, 900, P3D);
    background(0);
    
    g_Image.loadPixels();
    
    //g_Painter = new StrokePainter();
    //g_Painter = new VanGoghPainter();
-   g_Painter = new PatchPainter();
+   //g_Painter = new PatchPainter();
+   g_Painter = new ThreeDPainter();
 }
 
 void draw()
