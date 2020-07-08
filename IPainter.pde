@@ -5,8 +5,8 @@ interface IPainter
 
 class PatchPainter implements IPainter
 {
- float m_PatchSize = 5.0f;
- int m_PatchAlpha = 50;
+ float m_PatchSize = 12.0f;
+ int m_PatchAlpha = 120;
  
  int m_NumPatchesPerFrame = 1000;
  
@@ -39,7 +39,7 @@ class StrokePainter implements IPainter
   float m_FlowZ = 0.0f;
   
   float m_FlowDX = 0.008f;
-  float m_FlowDY = 0.01f;
+  float m_FlowDY = 0.001f;
   float m_FlowDZ = 0.0005f;
   
   public void draw()
@@ -69,14 +69,16 @@ class StrokePainter implements IPainter
 
 class VanGoghPainter implements IPainter
 { 
- float m_ParticleSize = 3.0f;
+ float m_ParticleSize = 6.0f;
  float m_FlowX = 0.0f;
   float m_FlowY = 0.0f;
   float m_FlowZ = 0.0f;
   
-  float m_FlowDX = 0.0008f;
-  float m_FlowDY = 0.001f;
+  float m_FlowDX = 0.00f;//8f;
+  float m_FlowDY = 0.0f;//1f;
   float m_FlowDZ = 0.00005f;
+  
+  float skyRatio = 0.4f;
  
  class Particle
  {
@@ -91,9 +93,22 @@ class VanGoghPainter implements IPainter
    
    void Update()
    {
-     float theta = map(noise((m_Pos.x/width) + m_FlowX, (m_Pos.y/height) + m_FlowY, m_FlowZ), 0.0f, 1.0f, 0.0f, TWO_PI);
+     boolean isSkyZone = (m_Pos.y / height) < 0.4f;
+     
+     float noiseVal;
+     if (isSkyZone)
+     {
+       float skyZoneMultiplier = 7.0f;
+       noiseVal = noise((skyZoneMultiplier * m_Pos.x/width) + m_FlowX, (skyZoneMultiplier * m_Pos.y/height), m_FlowZ);
+     }
+     else
+     {
+       noiseVal = noise((m_Pos.x/width) + m_FlowX, (m_Pos.y/height) + m_FlowY, m_FlowZ);
+     }
+     
+     float theta = map(noiseVal, 0.0f, 1.0f, 0.0f, TWO_PI);
      PVector vel = PVector.fromAngle(theta);
-     vel.mult(random(0.5f, 1.3f));
+     vel.mult(random(0.5f, isSkyZone ? 1.3f : 1.0f));
      m_Pos.add(vel);
    }
    
@@ -112,7 +127,7 @@ class VanGoghPainter implements IPainter
  
  ArrayList<Particle> m_Particles;
  int m_ParticleCount = 800;
- int m_ParticleUpdateCycle = 20;
+ int m_ParticleUpdateCycle = 30;
  
  VanGoghPainter()
  {
@@ -168,6 +183,11 @@ class VanGoghPainter implements IPainter
 
 class ThreeDPainter implements IPainter
 {
+  final int CENTER_DIST = 0;
+  final int BRIGHTNESS = 1;
+  int m_DrawMode;
+  long m_FrameCount;
+  
   class Particle
   {
    PVector m_ImgPos;
@@ -183,7 +203,9 @@ class ThreeDPainter implements IPainter
   
   ThreeDPainter()
   {
+    m_FrameCount = 0;
     m_Particles = new ArrayList<Particle>();
+    m_DrawMode = BRIGHTNESS;
     
     for (int y = 0; y < g_Image.height; ++y)
     {
@@ -196,19 +218,59 @@ class ThreeDPainter implements IPainter
   
   void draw()
   {
-    background(#ffffff);
-    //translate(g_Image.width/2, g_Image.height/2);
-    
+    background(#dddddd);   
     noStroke();
-    float distFactor = map(constrain(mouseX, 0, width), 0, width, -1.0f, 1.0f);
-    PVector center = new PVector(g_Image.width/2, g_Image.height/2);
+    
+    float spreadFactor = map(sin(radians(m_FrameCount++)), -1.0f, 1.0f, -2.0f, 2.0f);
+    //float spreadFactor = map(constrain(mouseX, 0, width), 0, width, -2.0f, 2.0f);
+    float spreadDist = 1000;
+    float camZ = (height/2.0) / tan(PI*30.0 / 180.0);
+    if (spreadFactor > 0.0f)
+    {
+      camZ += spreadFactor * spreadDist*cos(PI/4);//maxDist/tan(PI*30.0 / 180.0);
+    }
+    
+    camera(width/2, height/2, camZ, width/2, height/2, 0, 0, 1, 0); 
+    
+    switch(m_DrawMode)
+    {
+     case CENTER_DIST:
+     DrawCenterDistStyle(spreadFactor, spreadDist);
+     break;
+     
+     case BRIGHTNESS:
+     DrawBrightnessStyle(spreadFactor, spreadDist);
+     break;
+    }
+  }
+  
+  void DrawBrightnessStyle(float spreadFactor, float spreadDist)
+  {
+    float maxSpreadDist = spreadFactor * spreadDist;
+    for (Particle p : m_Particles)
+    {
+      float brightness = brightness(p.m_ImgCol); 
+      float z = map(brightness, 0.0f, 255.0f, 0.0f, maxSpreadDist);
+      pushMatrix();
+      translate(p.m_ImgPos.x, p.m_ImgPos.y, z);
+      fill(p.m_ImgCol);
+      ellipse(0, 0, 2.0f, 2.0f);
+      popMatrix();
+    }
+  }
+  
+  void DrawCenterDistStyle(float spreadFactor, float spreadDist)
+  {
+    float spreadConstant = spreadDist * spreadFactor;
+    PVector imgCenter = new PVector(g_Image.width/2, g_Image.height/2);
     float maxDistSq = (sq((g_Image.width/2)) + sq((g_Image.height/2)));
     float maxDist = sqrt(maxDistSq);
+
     for (Particle p : m_Particles)
     {
       pushMatrix();
-      PVector toCenter = PVector.sub(center, p.m_ImgPos);
-      float z = -5000 * distFactor * toCenter.mag() * toCenter.mag() / maxDistSq;
+      PVector toCenter = PVector.sub(imgCenter, p.m_ImgPos);
+      float z = spreadConstant * toCenter.mag() * toCenter.mag() / maxDistSq;
       translate(p.m_ImgPos.x, p.m_ImgPos.y, z);
       fill(p.m_ImgCol);
       ellipse(0, 0, 2.0f, 2.0f);
